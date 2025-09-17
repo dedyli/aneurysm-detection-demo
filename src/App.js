@@ -493,4 +493,3 @@ const RealAneurysmDetection = () => {
 };
 
 export default RealAneurysmDetection;
-
