@@ -344,3 +344,4 @@ const AneurysmDetectionPrototype = () => {
 };
 
 export default AneurysmDetectionPrototype;
+
