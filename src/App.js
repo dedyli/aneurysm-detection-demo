@@ -44,7 +44,7 @@ const AneurysmDetectionPrototype = () => {
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
-    if (file && file.type.startsWith('image/')) {
+    if (file && (file.type.startsWith('image/') || file.name.endsWith('.dcm'))) {
       setSelectedFile(file);
       setResults(null);
     }
@@ -185,13 +185,47 @@ const AneurysmDetectionPrototype = () => {
               </div>
 
               {selectedFile && (
-                <div className="bg-blue-50 rounded-lg p-4">
+                <div className="bg-blue-50 rounded-lg p-4 space-y-3">
                   <div className="flex items-center gap-2 mb-2">
                     <CheckCircle className="w-4 h-4 text-green-600" />
                     <span className="text-sm font-medium text-gray-800">File uploaded</span>
                   </div>
                   <p className="text-sm text-gray-600">{selectedFile.name}</p>
                   <p className="text-xs text-gray-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                  
+                  {/* Display uploaded image */}
+                  {selectedFile.type.startsWith('image/') && (
+                    <div className="mt-3">
+                      <p className="text-xs text-gray-500 mb-2">Preview:</p>
+                      <div className="relative border border-gray-200 rounded-lg overflow-hidden">
+                        <img 
+                          src={URL.createObjectURL(selectedFile)} 
+                          alt="Uploaded medical scan"
+                          className="w-full h-48 object-contain bg-black"
+                          onLoad={(e) => {
+                            // Clean up the object URL after image loads
+                            URL.revokeObjectURL(e.target.src);
+                          }}
+                        />
+                        <div className="absolute top-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+                          Medical Scan
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Show DICOM file indicator */}
+                  {selectedFile.name.endsWith('.dcm') && (
+                    <div className="mt-3 p-3 bg-indigo-50 border border-indigo-200 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Brain className="w-4 h-4 text-indigo-600" />
+                        <span className="text-sm font-medium text-indigo-800">DICOM File Detected</span>
+                      </div>
+                      <p className="text-xs text-indigo-600 mt-1">
+                        Medical imaging format ready for AI analysis
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -244,6 +278,25 @@ const AneurysmDetectionPrototype = () => {
               </div>
             ) : (
               <div className="space-y-4">
+                {/* Show analyzed image thumbnail */}
+                {selectedFile && selectedFile.type.startsWith('image/') && (
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <p className="text-xs text-gray-500 mb-2">Analyzed Image:</p>
+                    <div className="relative">
+                      <img 
+                        src={URL.createObjectURL(selectedFile)} 
+                        alt="Analyzed scan"
+                        className="w-full h-24 object-contain bg-black rounded"
+                      />
+                      <div className="absolute inset-0 bg-blue-500 bg-opacity-20 rounded flex items-center justify-center">
+                        <div className="bg-blue-600 text-white text-xs px-2 py-1 rounded">
+                          AI ANALYZED
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className={`p-4 rounded-lg ${results.prediction.includes('Detected') 
                   ? 'bg-red-50 border border-red-200' 
                   : 'bg-green-50 border border-green-200'}`}>
