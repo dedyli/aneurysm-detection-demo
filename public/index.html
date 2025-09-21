@@ -1,15 +1,452 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
-    <meta name="description" content="AI-Powered Aneurysm Detection System" />
-    <title>Aneurysm Detection Demo</title>
-  </head>
-  <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
-  </body>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ICH-Detect AI | Diagnostic Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827; /* bg-gray-900 */
+        }
+        .main-container {
+            display: grid;
+            grid-template-columns: 300px 1fr 400px;
+            gap: 1.5rem; /* gap-6 */
+            height: calc(100vh - 4rem);
+        }
+        .viewer-container {
+            position: relative;
+            overflow: hidden;
+            border-radius: 0.5rem; /* rounded-lg */
+        }
+        .viewer-image {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            transition: transform 0.2s ease;
+        }
+        .overlay-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+            transform-origin: center center;
+        }
+        .overlay-svg.visible {
+            opacity: 0.7;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3b82f6; /* blue-500 */
+            border-radius: 50%;
+            width: 32px;
+            height: 32px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .memo-textarea {
+            background-color: #374151; /* bg-gray-700 */
+            color: #d1d5db; /* text-gray-300 */
+            border-color: #4b5563; /* border-gray-600 */
+        }
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: #2563eb;
+        }
+        .btn-secondary {
+            background-color: #4b5563;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #6b7280;
+        }
+        .btn-toggle.active {
+            background-color: #3b82f6;
+            color: white;
+        }
+    </style>
+</head>
+<body class="text-gray-200">
+
+    <!-- Header -->
+    <header class="bg-gray-800 p-4 flex items-center justify-between shadow-md h-16">
+        <div class="flex items-center space-x-3">
+            <svg class="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+            <h1 class="text-xl font-bold text-white">ICH-Detect AI Diagnostic Assistant</h1>
+        </div>
+        <div class="text-sm text-gray-400">Version 3.1 (High-Fidelity ICH Model Simulation)</div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-container p-6">
+
+        <!-- Left Panel: Controls & Patient Info -->
+        <div class="bg-gray-800 rounded-lg p-4 flex flex-col space-y-6 overflow-y-auto">
+            <div>
+                <h2 class="text-lg font-semibold mb-3 border-b border-gray-700 pb-2">Patient Details</h2>
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-sm font-medium text-gray-400">Patient ID</label>
+                        <input type="text" value="PID-789456" class="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm mt-1" disabled>
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium text-gray-400">Study Date</label>
+                        <input type="text" value="2025-09-21" class="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-sm mt-1" disabled>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex-grow">
+                <h2 class="text-lg font-semibold mb-3 border-b border-gray-700 pb-2">NCCT Brain Scan</h2>
+                <p class="text-xs text-gray-500 mb-3">Upload a JPG/PNG file to begin analysis.</p>
+                <input type="file" id="image-upload" class="hidden" accept="image/jpeg, image/png">
+                <button id="upload-btn" class="w-full btn-secondary font-semibold py-2 px-4 rounded-md transition-colors duration-200">
+                    Upload Scan
+                </button>
+            </div>
+            
+            <div class="border-t border-gray-700 pt-4">
+                 <button id="analyze-btn" class="w-full btn-primary font-bold py-3 px-4 rounded-md transition-colors duration-200 disabled:bg-gray-600 disabled:cursor-not-allowed flex items-center justify-center space-x-2" disabled>
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2_0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    <span>Analyze with AI</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Center Panel: Image Viewer -->
+        <div class="bg-gray-800 rounded-lg p-4 flex flex-col">
+            <div class="flex items-center justify-between pb-3 border-b border-gray-700">
+                <span class="font-semibold">Axial View</span>
+                <div class="flex items-center space-x-2">
+                    <button id="overlay-toggle" class="px-3 py-1 text-sm font-medium rounded-md bg-gray-700 hover:bg-gray-600 btn-toggle disabled:bg-gray-800 disabled:text-gray-500 disabled:cursor-not-allowed" disabled>
+                        AI Overlay
+                    </button>
+                     <span class="text-sm text-gray-500">Zoom: <span id="zoom-level">100</span>%</span>
+                </div>
+            </div>
+            <div id="viewer" class="viewer-container flex-grow mt-3 bg-black flex items-center justify-center">
+                <img id="viewer-img" src="https://placehold.co/512x512/000000/333333?text=Upload+NCCT+Scan" alt="NCCT Brain Scan" class="viewer-image">
+                <div id="overlay-container" class="absolute top-0 left-0 w-full h-full pointer-events-none">
+                     <!-- Illustrative Overlays will be injected here by JS -->
+                </div>
+                 <div id="viewer-placeholder" class="text-center text-gray-500">
+                    <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    <p class="mt-2">No image loaded</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: AI Analysis & Memo -->
+        <div class="bg-gray-800 rounded-lg p-4 flex flex-col space-y-4">
+            <h2 class="text-lg font-semibold border-b border-gray-700 pb-2">AI Analysis Results</h2>
+            <div id="analysis-output" class="flex-grow space-y-4">
+                 <div id="pre-analysis" class="text-center text-gray-500 pt-16">
+                    <p>Awaiting analysis...</p>
+                </div>
+                <div id="analysis-loader" class="hidden text-center text-gray-400 pt-16">
+                    <div class="loader mx-auto"></div>
+                    <p id="loader-text" class="mt-4">Running specialized ICH model...</p>
+                </div>
+                 <div id="analysis-error" class="hidden text-center text-red-400 pt-16">
+                    <p>Analysis Failed. Please check the console for errors.</p>
+                </div>
+                <div id="analysis-results" class="hidden space-y-3">
+                    <div>
+                        <span class="font-semibold text-blue-400">Finding:</span>
+                        <p id="finding" class="text-lg font-bold"></p>
+                    </div>
+                    <div>
+                        <span class="font-semibold text-blue-400">ICH Type:</span>
+                        <p id="location" class="text-lg"></p>
+                    </div>
+                    <div>
+                        <span class="font-semibold text-blue-400">Confidence:</span>
+                        <p id="confidence" class="text-lg"></p>
+                    </div>
+                </div>
+            </div>
+            <div class="border-t border-gray-700 pt-4">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="text-md font-semibold">Radiologist Memo</h3>
+                    <button id="generate-memo-btn" class="btn-secondary text-sm font-semibold py-1 px-3 rounded-md transition-colors duration-200 disabled:bg-gray-600 disabled:cursor-not-allowed" disabled>Generate</button>
+                </div>
+                <div id="memo-container" class="relative">
+                    <textarea id="memo-textarea" rows="10" class="w-full text-sm rounded-md p-2 memo-textarea" placeholder="Generate a memo based on AI findings..."></textarea>
+                    <div id="memo-loader" class="absolute inset-0 bg-gray-700 bg-opacity-70 flex items-center justify-center rounded-md hidden">
+                        <div class="loader"></div>
+                    </div>
+                </div>
+                 <button id="copy-memo-btn" class="w-full mt-2 btn-secondary text-sm font-semibold py-2 px-3 rounded-md transition-colors duration-200 disabled:bg-gray-600 disabled:cursor-not-allowed" disabled>Copy Memo Text</button>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // --- DOM Elements ---
+        const uploadBtn = document.getElementById('upload-btn');
+        const imageUpload = document.getElementById('image-upload');
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const viewerImg = document.getElementById('viewer-img');
+        const viewerPlaceholder = document.getElementById('viewer-placeholder');
+        const overlayContainer = document.getElementById('overlay-container');
+        const overlayToggle = document.getElementById('overlay-toggle');
+        
+        const preAnalysis = document.getElementById('pre-analysis');
+        const analysisLoader = document.getElementById('analysis-loader');
+        const loaderText = document.getElementById('loader-text');
+        const analysisError = document.getElementById('analysis-error');
+        const analysisResults = document.getElementById('analysis-results');
+        const findingEl = document.getElementById('finding');
+        const confidenceEl = document.getElementById('confidence');
+        const locationEl = document.getElementById('location');
+
+        const generateMemoBtn = document.getElementById('generate-memo-btn');
+        const memoTextarea = document.getElementById('memo-textarea');
+        const memoLoader = document.getElementById('memo-loader');
+        const copyMemoBtn = document.getElementById('copy-memo-btn');
+
+        const viewer = document.getElementById('viewer');
+        const zoomLevelEl = document.getElementById('zoom-level');
+        
+        // --- State ---
+        let isImageLoaded = false;
+        let analysisData = null;
+        let zoomLevel = 1;
+        
+        // --- Illustrative Overlays ---
+        const overlays = {
+            intraparenchymal: '<svg class="overlay-svg" id="overlay-intraparenchymal" viewBox="0 0 512 512"><path d="M200,150 Q220,130 250,150 T300,150 Q320,180 300,210 T250,220 Q220,200 200,180 Z" fill="rgba(239, 68, 68, 0.8)" stroke="rgba(255, 255, 255, 0.8)" stroke-width="2"/></svg>',
+            subdural: '<svg class="overlay-svg" id="overlay-subdural" viewBox="0 0 512 512"><path d="M150,120 C180,250 180,350 150,480 Q250,350 250,180 Z" fill="rgba(239, 68, 68, 0.8)" stroke="rgba(255, 255, 255, 0.8)" stroke-width="2"/></svg>',
+            epidural: '<svg class="overlay-svg" id="overlay-epidural" viewBox="0 0 512 512"><path d="M150,150 C250,180 250,320 150,350 C180,300 180,200 150,150 Z" fill="rgba(239, 68, 68, 0.8)" stroke="rgba(255, 255, 255, 0.8)" stroke-width="2"/></svg>',
+            subarachnoid: '<svg class="overlay-svg" id="overlay-subarachnoid" viewBox="0 0 512 512"><path fill-rule="evenodd" d="M256,128 C309.02,128 352,170.98 352,224 C352,288.51 295.49,352 256,352 C190.51,352 128,288.51 128,224 C128,170.98 170.98,128 256,128 Z M256,160 C289.14,160 320,188.86 320,224 C320,259.14 289.14,288 256,288 C222.86,288 192,259.14 192,224 C192,188.86 222.86,160 256,160 Z" fill="rgba(239, 68, 68, 0.8)" stroke="rgba(255, 255, 255, 0.8)" stroke-width="2"/></svg>',
+            intraventricular: '<svg class="overlay-svg" id="overlay-intraventricular" viewBox="0 0 512 512"><path d="M256,220 L280,260 L256,300 L232,260 Z" fill="rgba(239, 68, 68, 0.8)" stroke="rgba(255, 255, 255, 0.8)" stroke-width="3"/></svg>'
+        };
+
+        // --- Event Listeners ---
+        uploadBtn.addEventListener('click', () => imageUpload.click());
+        imageUpload.addEventListener('change', handleImageUpload);
+        analyzeBtn.addEventListener('click', runAIAnalysis);
+        overlayToggle.addEventListener('click', toggleOverlay);
+        generateMemoBtn.addEventListener('click', generateMemo);
+        copyMemoBtn.addEventListener('click', copyMemoToClipboard);
+
+        viewer.addEventListener('wheel', (e) => {
+            if (!isImageLoaded) return;
+            e.preventDefault();
+            zoomLevel += e.deltaY * -0.001;
+            zoomLevel = Math.min(Math.max(0.5, zoomLevel), 4);
+            viewerImg.style.transform = `scale(${zoomLevel})`;
+            document.querySelectorAll('.overlay-svg').forEach(svg => {
+                svg.style.transform = `scale(${zoomLevel})`;
+            });
+            zoomLevelEl.textContent = Math.round(zoomLevel * 100);
+        });
+
+        // --- Functions ---
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    viewerImg.src = e.target.result;
+                    viewerPlaceholder.classList.add('hidden');
+                    viewerImg.classList.remove('hidden');
+                    analyzeBtn.disabled = false;
+                    isImageLoaded = true;
+                    resetUI();
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        function resetUI() {
+            analysisData = null;
+            preAnalysis.classList.remove('hidden');
+            analysisResults.classList.add('hidden');
+            analysisLoader.classList.add('hidden');
+            analysisError.classList.add('hidden');
+            
+            generateMemoBtn.disabled = true;
+            memoTextarea.value = '';
+            memoTextarea.placeholder = "Generate a memo based on AI findings...";
+            copyMemoBtn.disabled = true;
+
+            overlayContainer.innerHTML = ''; // Clear overlays
+            overlayToggle.classList.remove('active');
+            overlayToggle.disabled = true;
+            
+            zoomLevel = 1;
+            viewerImg.style.transform = 'scale(1)';
+            zoomLevelEl.textContent = '100';
+        }
+
+        async function runAIAnalysis() {
+            if (!isImageLoaded) {
+                alert('Please upload an image first.');
+                return;
+            }
+
+            preAnalysis.classList.add('hidden');
+            analysisResults.classList.add('hidden');
+            analysisError.classList.add('hidden');
+            analysisLoader.classList.remove('hidden');
+            analyzeBtn.disabled = true;
+            analyzeBtn.querySelector('span').textContent = "Analyzing...";
+            resetUI();
+
+            try {
+                // This function simulates a call to a real, specialized ICH model.
+                // It introduces a delay and generates random, medically plausible results.
+                await new Promise(resolve => setTimeout(resolve, 2500)); // Simulate processing time
+
+                const ichTypes = ['intraparenchymal', 'subdural', 'epidural', 'subarachnoid', 'intraventricular'];
+                const hasHemorrhage = Math.random() > 0.3; // 70% chance of positive finding for demo
+
+                if (hasHemorrhage) {
+                    const randomType = ichTypes[Math.floor(Math.random() * ichTypes.length)];
+                    const randomConfidence = Math.random() * (0.99 - 0.85) + 0.85; // High confidence
+                    analysisData = {
+                        type: randomType,
+                        confidence: randomConfidence
+                    };
+                } else {
+                    analysisData = {
+                        type: 'no_hemorrhage',
+                        confidence: Math.random() * (0.99 - 0.90) + 0.90 // High confidence in negative
+                    };
+                }
+                
+                console.log('Simulated ICH Model Result:', analysisData);
+                
+                analysisLoader.classList.add('hidden');
+                
+                // Display the results
+                if (analysisData.type === 'no_hemorrhage') {
+                    findingEl.textContent = 'No Intracranial Hemorrhage Detected';
+                    findingEl.classList.add('text-green-400');
+                    findingEl.classList.remove('text-red-400');
+                    locationEl.textContent = 'N/A';
+                    confidenceEl.textContent = `${(analysisData.confidence * 100).toFixed(1)}%`;
+                } else {
+                    findingEl.textContent = 'Intracranial Hemorrhage Detected';
+                    findingEl.classList.add('text-red-400');
+                    findingEl.classList.remove('text-green-400');
+                    const friendlyLabel = analysisData.type.charAt(0).toUpperCase() + analysisData.type.slice(1);
+                    locationEl.textContent = friendlyLabel;
+                    confidenceEl.textContent = `${(analysisData.confidence * 100).toFixed(1)}%`;
+                    overlayToggle.disabled = false;
+                    showIllustrativeOverlay(analysisData.type);
+                }
+                analysisResults.classList.remove('hidden');
+                generateMemoBtn.disabled = false;
+
+            } catch (error) {
+                console.error("Analysis simulation failed:", error);
+                analysisLoader.classList.add('hidden');
+                analysisError.classList.remove('hidden');
+            } finally {
+                analyzeBtn.disabled = false;
+                analyzeBtn.querySelector('span').textContent = "Analyze with AI";
+            }
+        }
+        
+        function showIllustrativeOverlay(hemorrhageType) {
+            overlayContainer.innerHTML = ''; // Clear previous
+            if (overlays[hemorrhageType]) {
+                overlayContainer.innerHTML = overlays[hemorrhageType];
+                const svg = overlayContainer.querySelector('svg');
+                svg.style.transform = `scale(${zoomLevel})`;
+            }
+        }
+
+        function toggleOverlay() {
+            if (overlayToggle.disabled) return;
+            const overlay = overlayContainer.querySelector('.overlay-svg');
+            if(overlay) overlay.classList.toggle('visible');
+            overlayToggle.classList.toggle('active');
+        }
+
+        async function generateMemo() {
+            if (!analysisData) return;
+
+            memoLoader.classList.remove('hidden');
+            generateMemoBtn.disabled = true;
+            memoTextarea.value = '';
+
+            const apiKey = ""; // Leave blank, Canvas will provide it
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            
+            const systemPrompt = "You are a board-certified radiologist. Your task is to write a concise, professional, and structured radiology report memo based on findings from a simulated AI analysis of a Non-Contrast CT (NCCT) scan of the brain. The report should be clear and follow standard medical terminology and structure.";
+            
+            let userQuery;
+            if (analysisData.type !== 'no_hemorrhage') {
+                 const friendlyLabel = analysisData.type.charAt(0).toUpperCase() + analysisData.type.slice(1).replace('_', ' ');
+                 userQuery = `A simulated AI tool has detected an Intracranial Hemorrhage, classified as '${friendlyLabel}' with a confidence of ${(analysisData.confidence * 100).toFixed(1)}%. Generate the radiologist's memo. Patient ID is PID-789456, Study Date is 2025-09-21. Include TECHNIQUE, FINDINGS, and IMPRESSION sections. In the FINDINGS, describe the location and appearance typical for this type of hemorrhage.`;
+            } else {
+                userQuery = `A simulated AI tool analyzed a Non-Contrast CT scan of the brain and found no evidence of intracranial hemorrhage with ${(analysisData.confidence * 100).toFixed(1)}% confidence. Please generate a normal radiologist's memo. Patient ID is PID-789456, Study Date is 2025-09-21. Include TECHNIQUE, FINDINGS, and IMPRESSION sections confirming the absence of acute intracranial findings.`;
+            }
+           
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) throw new Error(`API Error: ${response.status}`);
+                const result = await response.json();
+                const memoText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (memoText) {
+                    memoTextarea.value = memoText;
+                    copyMemoBtn.disabled = false;
+                } else {
+                    memoTextarea.value = "Error: The model did not return valid text.";
+                }
+
+            } catch (error) {
+                console.error('Error generating memo:', error);
+                memoTextarea.value = `Failed to generate memo. Error: ${error.message}`;
+            } finally {
+                memoLoader.classList.add('hidden');
+                generateMemoBtn.disabled = false;
+            }
+        }
+        
+        function copyMemoToClipboard() {
+            memoTextarea.select();
+            document.execCommand('copy');
+            copyMemoBtn.textContent = 'Copied!';
+            setTimeout(() => { copyMemoBtn.textContent = 'Copy Memo Text'; }, 2000);
+        }
+
+        function initialize() {
+            viewerImg.classList.add('hidden');
+            viewerPlaceholder.classList.remove('hidden');
+        }
+
+        initialize();
+    </script>
+</body>
 </html>
