@@ -1,505 +1,1053 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CEREBRO: AI Stroke Triage</title>
+    <title>CEREBRO: AI Stroke Triage System</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: 'Inter', sans-serif;
-            background-color: #0a0a1a;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cg fill='%231a2035' fill-opacity='0.7'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm58-33c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM20 64c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm-8-41c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3z'%3E%3C/path%3E%3C/g%3E%3C/svg%3E");
+            font-family: 'IBM Plex Sans', sans-serif;
+            background-color: #0f0f0f;
         }
-        .glassmorphism {
-            background: rgba(10, 10, 26, 0.6);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+        .mono { font-family: 'IBM Plex Mono', monospace; }
+        .viewer-panel { background: #1a1a1a; border: 1px solid #2d2d2d; }
+        .side-panel { background: #1a1a1a; border: 1px solid #2d2d2d; }
+        .tool-btn {
+            background: #2d2d2d;
+            border: 1px solid #3d3d3d;
+            color: #b0b0b0;
+            transition: all 0.15s;
+        }
+        .tool-btn:hover { background: #3d3d3d; color: #fff; }
+        .tool-btn.active { background: #0ea5e9; color: #fff; border-color: #0ea5e9; }
+        .tab-btn {
+            background: transparent;
+            border-bottom: 2px solid transparent;
+            color: #808080;
+            padding: 8px 16px;
+            transition: all 0.15s;
+        }
+        .tab-btn:hover { color: #b0b0b0; }
+        .tab-btn.active { color: #0ea5e9; border-bottom-color: #0ea5e9; }
+        .metadata-overlay {
+            position: absolute;
+            font-size: 11px;
+            color: #e5e5e5;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.8);
+            pointer-events: none;
+            z-index: 10;
         }
         .loader {
-            border: 4px solid #f3f3f3;
+            border: 3px solid #2d2d2d;
             border-radius: 50%;
-            border-top: 4px solid #3498db;
-            width: 40px;
-            height: 40px;
-            animation: spin 2s linear infinite;
+            border-top: 3px solid #0ea5e9;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
         }
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .fade-in {
-            animation: fadeIn 0.5s ease-in-out;
+        #image-canvas {
+            cursor: crosshair;
+            image-rendering: crisp-edges;
         }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        .measurement-line {
+            stroke: #0ea5e9;
+            stroke-width: 2;
+            fill: none;
         }
+        .measurement-point {
+            fill: #0ea5e9;
+            stroke: #fff;
+            stroke-width: 1;
+        }
+        .measurement-text {
+            fill: #0ea5e9;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 12px;
+            font-weight: 500;
+        }
+        .heatmap-overlay {
+            position: absolute;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(255,0,0,0.5) 0%, rgba(255,100,0,0.3) 40%, rgba(255,200,0,0.1) 70%, transparent 100%);
+            pointer-events: none;
+            border: 2px solid rgba(255,0,0,0.6);
+        }
+        input[type="text"], textarea {
+            background: #2d2d2d;
+            border: 1px solid #3d3d3d;
+            color: #e5e5e5;
+        }
+        input[type="text"]:focus, textarea:focus {
+            outline: none;
+            border-color: #0ea5e9;
+        }
+        .status-bar {
+            background: #1a1a1a;
+            border-top: 1px solid #2d2d2d;
+            font-size: 11px;
+            color: #808080;
+        }
+        .urgency-critical { background: #7f1d1d; border-color: #991b1b; color: #fecaca; }
+        .urgency-high { background: #7c2d12; border-color: #9a3412; color: #fed7aa; }
+        .urgency-moderate { background: #713f12; border-color: #854d0e; color: #fde68a; }
+        .urgency-low { background: #14532d; border-color: #166534; color: #bbf7d0; }
     </style>
 </head>
-<body class="bg-gray-900 text-white">
+<body class="bg-black text-gray-200">
 
-    <div class="min-h-screen flex flex-col">
-        <!-- Header -->
-        <header class="bg-gray-900/50 backdrop-blur-sm sticky top-0 z-20 border-b border-gray-700/50">
-            <div class="container mx-auto px-4 sm:px-6 lg:px-8">
-                <div class="flex items-center justify-between h-16">
-                    <div class="flex items-center space-x-4">
-                        <svg class="h-10 w-10 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                            <path d="M9 12h6" />
-                            <path d="M9 12l-1.5-1.5" />
-                            <path d="M9 12l-1.5 1.5" />
-                            <path d="M15 12l1.5-1.5" />
-                            <path d="M15 12l1.5 1.5" />
-                            <path d="M12 9V7.5" />
-                            <path d="M12 15v1.5" />
-                            <circle cx="12" cy="12" r="9" />
-                            <path d="M7.5 7.5c1-1 2-1.5 3-1.5" />
-                            <path d="M16.5 16.5c-1 1-2 1.5-3 1.5" />
-                            <path d="M7.5 16.5c-1-1-1.5-2-1.5-3" />
-                            <path d="M16.5 7.5c1 1 1.5 2 1.5 3" />
-                        </svg>
-                        <h1 class="text-lg font-semibold text-gray-200 tracking-wider">CEREBRO - Group 28 IEDE Program Tsinghua University</h1>
-                    </div>
-                </div>
+    <!-- Top Header -->
+    <header class="bg-[#1a1a1a] border-b border-[#2d2d2d] h-12 flex items-center px-4">
+        <div class="flex items-center space-x-3">
+            <svg class="h-7 w-7 text-[#0ea5e9]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M9 12h6M9 12l-1.5-1.5M9 12l-1.5 1.5M15 12l1.5-1.5M15 12l1.5 1.5" />
+            </svg>
+            <span class="text-sm font-semibold tracking-wide text-gray-300">CEREBRO</span>
+            <span class="text-xs text-gray-500">|</span>
+            <span class="text-xs text-gray-500">Stroke Triage AI - Tsinghua IEDE Group 28</span>
+        </div>
+        <div class="ml-auto flex items-center space-x-3 text-xs">
+            <button id="save-btn" class="tool-btn px-3 py-1 rounded text-xs">💾 Save</button>
+            <button id="export-btn" class="tool-btn px-3 py-1 rounded text-xs">📄 Export PDF</button>
+            <button id="reset-header-btn" class="tool-btn px-3 py-1 rounded text-xs">🔄 New Case</button>
+        </div>
+    </header>
+
+    <!-- Main Layout -->
+    <div class="flex h-[calc(100vh-3rem-28px)]">
+        
+        <!-- Left Toolbar -->
+        <div class="w-16 bg-[#1a1a1a] border-r border-[#2d2d2d] flex flex-col items-center py-3 space-y-2">
+            <button id="tool-upload" class="tool-btn w-12 h-12 rounded flex items-center justify-center text-lg" title="Upload Image">📁</button>
+            <button id="tool-pan" class="tool-btn w-12 h-12 rounded flex items-center justify-center text-lg" title="Pan">✋</button>
+            <button id="tool-zoom" class="tool-btn w-12 h-12 rounded flex items-center justify-center text-lg" title="Zoom">🔍</button>
+            <button id="tool-measure" class="tool-btn w-12 h-12 rounded flex items-center justify-center text-lg" title="Measure Distance">📏</button>
+            <button id="tool-annotate" class="tool-btn w-12 h-12 rounded flex items-center justify-center text-lg" title="Annotations">✏️</button>
+            <div class="flex-grow"></div>
+            <button id="tool-clear" class="tool-btn w-12 h-12 rounded flex items-center justify-center text-lg" title="Clear Measurements">🗑️</button>
+        </div>
+
+        <!-- Center: Image Viewer -->
+        <div class="flex-grow viewer-panel flex flex-col">
+            <!-- Patient Info Bar -->
+            <div class="h-10 bg-[#0f0f0f] border-b border-[#2d2d2d] flex items-center px-4 text-xs mono space-x-6">
+                <div><span class="text-gray-500">Patient:</span> <span id="patient-name" class="text-gray-300">Anonymous</span></div>
+                <div><span class="text-gray-500">ID:</span> <span id="patient-id" class="text-gray-300">-</span></div>
+                <div><span class="text-gray-500">Age:</span> <span id="patient-age" class="text-gray-300">-</span></div>
+                <div><span class="text-gray-500">Sex:</span> <span id="patient-sex" class="text-gray-300">-</span></div>
+                <div class="ml-auto"><span class="text-gray-500">Study:</span> <span id="study-date" class="text-gray-300">-</span></div>
             </div>
-        </header>
 
-        <!-- Main Content -->
-        <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-grow">
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-
-                <!-- Input Column -->
-                <div class="glassmorphism rounded-xl p-6 lg:p-8 flex flex-col space-y-6 h-full">
-                    <h2 class="text-xl font-semibold">Triage Input</h2>
-
-                    <!-- Image Upload -->
-                    <div>
-                        <label for="ct-scan-upload" class="block text-sm font-medium text-gray-300 mb-2">1. Upload Brain CT Scan</label>
-                        <div id="image-drop-area" class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-600 border-dashed rounded-md cursor-pointer hover:border-blue-400 transition-colors">
-                            <div class="space-y-1 text-center w-full">
-                                <div id="image-preview-container" class="relative hidden w-full h-48 mx-auto">
-                                    <img id="image-preview" src="" alt="CT Scan Preview" class="mx-auto h-full w-auto rounded-md object-contain">
-                                    <div id="image-overlay" class="absolute hidden rounded-full pointer-events-none" style="background: radial-gradient(circle, rgba(255,0,0,0.6) 0%, rgba(255,150,0,0.3) 50%, rgba(255,255,0,0) 70%);"></div>
-                                </div>
-                                <div id="upload-placeholder">
-                                     <svg class="mx-auto h-12 w-12 text-gray-500" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
-                                        <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
-                                    </svg>
-                                    <div class="flex text-sm text-gray-400">
-                                        <p class="pl-1">Click to upload or drag and drop</p>
-                                    </div>
-                                    <p class="text-xs text-gray-500">PNG, JPG, WEBP</p>
-                                </div>
-                            </div>
-                        </div>
-                        <input id="ct-scan-upload" type="file" class="sr-only" accept="image/png, image/jpeg, image/webp">
-                    </div>
-
-                    <!-- Symptoms Input -->
-                    <div>
-                        <label for="symptoms" class="block text-sm font-medium text-gray-300">2. Patient Symptoms & History</label>
-                        <textarea id="symptoms" rows="8" class="mt-1 block w-full bg-gray-800/50 border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm text-white p-3 resize-none" placeholder="e.g., 65-year-old male presenting with sudden onset of left-sided weakness and slurred speech. History of hypertension..."></textarea>
-                    </div>
-
-                    <!-- Analyze Button -->
-                    <div class="pt-4">
-                        <button id="analyze-button" class="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-blue-500 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed">
-                            <span id="button-text">Analyze Case</span>
-                            <div id="button-loader" class="hidden loader" style="width:20px; height:20px; border-width:2px;"></div>
-                        </button>
-                    </div>
+            <!-- Image Container -->
+            <div id="viewer-container" class="flex-grow relative bg-black overflow-hidden">
+                <!-- Upload Placeholder -->
+                <div id="upload-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-gray-600">
+                    <svg class="h-16 w-16 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <p class="text-sm">Click 📁 Upload or drag image here</p>
+                    <p class="text-xs text-gray-700 mt-1">Supported: JPEG, PNG, WEBP</p>
                 </div>
 
-                <!-- Output Column -->
-                <div id="output-container" class="glassmorphism rounded-xl p-6 lg:p-8">
-                    <h2 class="text-xl font-semibold mb-6">AI Triage Analysis</h2>
-                    <div id="analysis-placeholder" class="text-center text-gray-500 py-16">
-                        <svg class="mx-auto h-12 w-12" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                           <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-6.75 0H7.5" />
-                        </svg>
-                        <p class="mt-4 text-sm">Analysis results will appear here.</p>
-                    </div>
-                    <div id="analysis-result" class="hidden fade-in space-y-6">
-                        <!-- Triage Recommendation -->
+                <!-- Canvas for Image + Measurements -->
+                <canvas id="image-canvas" class="absolute hidden" style="top: 50%; left: 50%; transform: translate(-50%, -50%);"></canvas>
+
+                <!-- Metadata Overlays -->
+                <div class="metadata-overlay top-2 left-2 mono">
+                    <div id="meta-institution" class="text-[10px] text-gray-400">CEREBRO Triage System</div>
+                    <div id="meta-patient-overlay" class="mt-1 text-gray-300">-</div>
+                    <div id="meta-scan-params" class="mt-1 text-gray-400 text-[10px]">CT Brain | Axial</div>
+                </div>
+                <div class="metadata-overlay top-2 right-2 mono text-right">
+                    <div id="meta-date-overlay" class="text-gray-300">-</div>
+                    <div id="meta-modality" class="mt-1 text-gray-400 text-[10px]">CT</div>
+                    <div id="meta-slice" class="mt-1 text-gray-400 text-[10px]">Slice: 1/1</div>
+                </div>
+                <div class="metadata-overlay bottom-2 left-2 mono">
+                    <div id="meta-window" class="text-gray-400 text-[10px]">W/L: 80/40</div>
+                    <div id="meta-zoom" class="mt-1 text-gray-400 text-[10px]">Zoom: 100%</div>
+                </div>
+
+                <!-- Heatmap Overlay -->
+                <div id="heatmap-overlay" class="heatmap-overlay hidden"></div>
+
+                <!-- Hidden File Input -->
+                <input id="file-input" type="file" accept="image/*" class="hidden">
+            </div>
+        </div>
+
+        <!-- Right Panel -->
+        <div class="w-96 side-panel flex flex-col">
+            <!-- Tabs -->
+            <div class="flex border-b border-[#2d2d2d] text-xs">
+                <button class="tab-btn active" data-tab="patient">Patient</button>
+                <button class="tab-btn" data-tab="analysis">Analysis</button>
+                <button class="tab-btn" data-tab="measurements">Measurements</button>
+                <button class="tab-btn" data-tab="report">Report</button>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="flex-grow overflow-y-auto p-4">
+                
+                <!-- Patient Tab -->
+                <div id="tab-patient" class="tab-content">
+                    <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Patient Demographics</h3>
+                    <div class="space-y-3 text-sm">
                         <div>
-                            <h3 class="text-sm font-medium text-gray-400 mb-2">Triage Recommendation</h3>
-                            <div id="triage-banner" class="p-4 rounded-lg flex items-center space-x-4">
-                                <div id="triage-icon" class="h-8 w-8"></div>
-                                <div>
-                                    <p id="triage-diagnosis" class="font-semibold text-lg"></p>
-                                    <p id="triage-level" class="text-sm"></p>
-                                </div>
+                            <label class="text-xs text-gray-500 block mb-1">Patient Name</label>
+                            <input id="input-name" type="text" class="w-full px-2 py-1 text-sm rounded" placeholder="Anonymous">
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="text-xs text-gray-500 block mb-1">Age</label>
+                                <input id="input-age" type="text" class="w-full px-2 py-1 text-sm rounded" placeholder="65">
+                            </div>
+                            <div>
+                                <label class="text-xs text-gray-500 block mb-1">Sex</label>
+                                <input id="input-sex" type="text" class="w-full px-2 py-1 text-sm rounded" placeholder="M/F">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-500 block mb-1">Patient ID</label>
+                            <input id="input-id" type="text" class="w-full px-2 py-1 text-sm rounded" placeholder="AUTO-" disabled>
+                        </div>
+                    </div>
+
+                    <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3 mt-6">Clinical History</h3>
+                    <div>
+                        <label class="text-xs text-gray-500 block mb-1">Symptoms & History</label>
+                        <textarea id="input-symptoms" rows="10" class="w-full px-2 py-1 text-sm rounded resize-none" placeholder="e.g., 65-year-old male presenting with sudden onset left-sided weakness and slurred speech. Last known normal: 2 hours ago. History: Hypertension, atrial fibrillation..."></textarea>
+                    </div>
+
+                    <button id="analyze-btn" class="w-full mt-4 bg-[#0ea5e9] hover:bg-[#0284c7] text-white py-2 rounded text-sm font-medium transition-colors flex items-center justify-center">
+                        <span id="analyze-text">Run AI Analysis</span>
+                        <div id="analyze-loader" class="loader hidden ml-2"></div>
+                    </button>
+                </div>
+
+                <!-- Analysis Tab -->
+                <div id="tab-analysis" class="tab-content hidden">
+                    <div id="analysis-placeholder" class="text-center py-16 text-gray-600">
+                        <svg class="mx-auto h-12 w-12 mb-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                        <p class="text-sm">No analysis yet</p>
+                        <p class="text-xs mt-1">Upload image and run analysis</p>
+                    </div>
+
+                    <div id="analysis-result" class="hidden space-y-4">
+                        <!-- Urgency Banner -->
+                        <div id="urgency-banner" class="p-3 rounded border flex items-center space-x-3">
+                            <div id="urgency-icon" class="text-2xl"></div>
+                            <div>
+                                <div id="urgency-diagnosis" class="font-semibold text-sm"></div>
+                                <div id="urgency-level" class="text-xs opacity-90"></div>
                             </div>
                         </div>
 
-                        <!-- Confidence Score -->
+                        <!-- Confidence -->
                         <div>
-                            <h3 class="text-sm font-medium text-gray-400 mb-2">Confidence Score</h3>
-                            <div class="w-full bg-gray-700 rounded-full h-2.5">
-                                <div id="confidence-bar" class="bg-blue-500 h-2.5 rounded-full" style="width: 0%"></div>
+                            <div class="flex justify-between text-xs text-gray-400 mb-1">
+                                <span>AI Confidence</span>
+                                <span id="confidence-value" class="mono">-</span>
                             </div>
-                            <p id="confidence-text" class="text-right text-sm mt-1 font-mono"></p>
+                            <div class="w-full bg-[#2d2d2d] rounded-full h-2">
+                                <div id="confidence-bar" class="bg-[#0ea5e9] h-2 rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
                         </div>
-                        
+
                         <!-- AI Summary -->
                         <div>
-                            <h3 class="text-sm font-medium text-gray-400 mb-2">Clinician Summary</h3>
-                            <div id="summary-text" class="text-gray-300 text-sm leading-relaxed p-4 bg-gray-800/50 rounded-md border border-gray-700 whitespace-pre-wrap"></div>
+                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Findings</h4>
+                            <div id="ai-summary" class="text-xs leading-relaxed text-gray-300 bg-[#0f0f0f] p-3 rounded border border-[#2d2d2d] whitespace-pre-wrap"></div>
                         </div>
 
-                         <!-- Reset Button -->
+                        <!-- Recommendations -->
                         <div>
-                            <button id="reset-button" class="w-full flex justify-center items-center py-2 px-4 border border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-gray-500 transition-colors">
-                                Analyze New Case
-                            </button>
+                            <h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Recommendations</h4>
+                            <ul id="recommendations-list" class="text-xs space-y-1 text-gray-300">
+                                <li>• Immediate CT angiography</li>
+                                <li>• Neurology consultation</li>
+                                <li>• Monitor vitals q15min</li>
+                            </ul>
                         </div>
-
                     </div>
-                    <div id="error-message" class="hidden fade-in text-center text-red-400 bg-red-900/50 p-4 rounded-md"></div>
+
+                    <div id="analysis-error" class="hidden p-3 bg-red-900/30 border border-red-800 rounded text-red-300 text-xs"></div>
                 </div>
+
+                <!-- Measurements Tab -->
+                <div id="tab-measurements" class="tab-content hidden">
+                    <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Active Measurements</h3>
+                    <div id="measurements-list" class="space-y-2 text-xs">
+                        <div class="text-gray-600 text-center py-8">
+                            <p>No measurements yet</p>
+                            <p class="text-[10px] mt-1">Use 📏 tool to measure distances</p>
+                        </div>
+                    </div>
+                    <button id="clear-measurements" class="w-full mt-4 tool-btn py-2 rounded text-xs">Clear All Measurements</button>
+                </div>
+
+                <!-- Report Tab -->
+                <div id="tab-report" class="tab-content hidden">
+                    <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Structured Report</h3>
+                    <div id="report-content" class="text-xs space-y-3 mono">
+                        <div class="text-gray-600 text-center py-8">
+                            <p>No report generated</p>
+                            <p class="text-[10px] mt-1">Complete analysis to generate report</p>
+                        </div>
+                    </div>
+                    <button id="copy-report" class="w-full mt-4 tool-btn py-2 rounded text-xs hidden">📋 Copy to Clipboard</button>
+                </div>
+
             </div>
-        </main>
+        </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar h-7 px-4 flex items-center space-x-6 mono">
+        <span id="status-text">Ready</span>
+        <span class="text-gray-700">|</span>
+        <span id="status-confidence">Confidence: -</span>
+        <span class="text-gray-700">|</span>
+        <span id="status-time">Processing: -</span>
+        <span class="text-gray-700">|</span>
+        <span id="status-image">No image loaded</span>
+        <div class="ml-auto text-[10px] text-gray-700">CEREBRO v1.0 | Tsinghua IEDE 2025</div>
     </div>
 
 <script type="module">
-    // --- DOM Elements ---
-    const imageDropArea = document.getElementById('image-drop-area');
-    const imageUploadInput = document.getElementById('ct-scan-upload');
-    const imagePreviewContainer = document.getElementById('image-preview-container');
-    const imagePreview = document.getElementById('image-preview');
-    const imageOverlay = document.getElementById('image-overlay');
+    // ============ STATE MANAGEMENT ============
+    const state = {
+        currentTool: 'pan',
+        uploadedFile: null,
+        imageLoaded: false,
+        analysisData: null,
+        measurements: [],
+        tempMeasurement: null,
+        scale: 1,
+        panX: 0,
+        panY: 0,
+        isPanning: false,
+        lastMouseX: 0,
+        lastMouseY: 0,
+        pixelSpacing: 0.5, // mm per pixel (approximate for CT)
+    };
+
+    // ============ DOM ELEMENTS ============
+    const canvas = document.getElementById('image-canvas');
+    const ctx = canvas.getContext('2d');
+    const viewerContainer = document.getElementById('viewer-container');
     const uploadPlaceholder = document.getElementById('upload-placeholder');
-    const symptomsInput = document.getElementById('symptoms');
-    const analyzeButton = document.getElementById('analyze-button');
-    const buttonText = document.getElementById('button-text');
-    const buttonLoader = document.getElementById('button-loader');
-    
-    const outputContainer = document.getElementById('output-container');
-    const placeholder = document.getElementById('analysis-placeholder');
-    const resultContainer = document.getElementById('analysis-result');
-    const errorMessage = document.getElementById('error-message');
-    
-    const triageBanner = document.getElementById('triage-banner');
-    const triageIcon = document.getElementById('triage-icon');
-    const triageDiagnosis = document.getElementById('triage-diagnosis');
-    const triageLevel = document.getElementById('triage-level');
-    
-    const confidenceBar = document.getElementById('confidence-bar');
-    const confidenceText = document.getElementById('confidence-text');
-    const summaryText = document.getElementById('summary-text');
-    const resetButton = document.getElementById('reset-button');
+    const fileInput = document.getElementById('file-input');
+    const heatmapOverlay = document.getElementById('heatmap-overlay');
 
-    let uploadedFile = null;
+    // Tools
+    const toolUpload = document.getElementById('tool-upload');
+    const toolPan = document.getElementById('tool-pan');
+    const toolZoom = document.getElementById('tool-zoom');
+    const toolMeasure = document.getElementById('tool-measure');
+    const toolAnnotate = document.getElementById('tool-annotate');
+    const toolClear = document.getElementById('tool-clear');
 
-    // --- State Management ---
-    function setUIState(state) {
-        switch (state) {
-            case 'loading':
-                analyzeButton.disabled = true;
-                buttonText.classList.add('hidden');
-                buttonLoader.classList.remove('hidden');
-                placeholder.classList.add('hidden');
-                resultContainer.classList.add('hidden');
-                errorMessage.classList.add('hidden');
-                break;
-            case 'result':
-                analyzeButton.disabled = false;
-                buttonText.classList.remove('hidden');
-                buttonLoader.classList.add('hidden');
-                placeholder.classList.add('hidden');
-                resultContainer.classList.remove('hidden');
-                errorMessage.classList.add('hidden');
-                break;
-            case 'error':
-                 analyzeButton.disabled = false;
-                buttonText.classList.remove('hidden');
-                buttonLoader.classList.add('hidden');
-                placeholder.classList.add('hidden');
-                resultContainer.classList.add('hidden');
-                errorMessage.classList.remove('hidden');
-                break;
-            case 'initial':
-            default:
-                analyzeButton.disabled = false;
-                buttonText.classList.remove('hidden');
-                buttonLoader.classList.add('hidden');
-                placeholder.classList.remove('hidden');
-                resultContainer.classList.add('hidden');
-                errorMessage.classList.add('hidden');
-                imagePreview.src = '';
-                imagePreviewContainer.classList.add('hidden');
-                uploadPlaceholder.classList.remove('hidden');
-                hideOverlay();
-                symptomsInput.value = '';
-                uploadedFile = null;
-                break;
+    // Patient inputs
+    const inputName = document.getElementById('input-name');
+    const inputAge = document.getElementById('input-age');
+    const inputSex = document.getElementById('input-sex');
+    const inputId = document.getElementById('input-id');
+    const inputSymptoms = document.getElementById('input-symptoms');
+
+    // Tabs
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+
+    // Analysis
+    const analyzeBtn = document.getElementById('analyze-btn');
+    const analyzeText = document.getElementById('analyze-text');
+    const analyzeLoader = document.getElementById('analyze-loader');
+    const analysisPlaceholder = document.getElementById('analysis-placeholder');
+    const analysisResult = document.getElementById('analysis-result');
+    const analysisError = document.getElementById('analysis-error');
+
+    // Header buttons
+    const saveBtn = document.getElementById('save-btn');
+    const exportBtn = document.getElementById('export-btn');
+    const resetHeaderBtn = document.getElementById('reset-header-btn');
+
+    // Measurements
+    const measurementsList = document.getElementById('measurements-list');
+    const clearMeasurementsBtn = document.getElementById('clear-measurements');
+
+    // Status bar
+    const statusText = document.getElementById('status-text');
+    const statusConfidence = document.getElementById('status-confidence');
+    const statusTime = document.getElementById('status-time');
+    const statusImage = document.getElementById('status-image');
+
+    // ============ UTILITY FUNCTIONS ============
+    function generatePatientId() {
+        const now = new Date();
+        return `AUTO-${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}-${String(Math.floor(Math.random()*9999)).padStart(4,'0')}`;
+    }
+
+    function updateMetadata() {
+        const name = inputName.value || 'Anonymous';
+        const age = inputAge.value || '-';
+        const sex = inputSex.value || '-';
+        const id = inputId.value || '-';
+        
+        document.getElementById('patient-name').textContent = name;
+        document.getElementById('patient-age').textContent = age;
+        document.getElementById('patient-sex').textContent = sex;
+        document.getElementById('patient-id').textContent = id;
+        
+        document.getElementById('meta-patient-overlay').textContent = `${name} | ${age}y ${sex}`;
+        
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        document.getElementById('study-date').textContent = `${dateStr} ${timeStr}`;
+        document.getElementById('meta-date-overlay').textContent = dateStr;
+    }
+
+    // ============ TOOL MANAGEMENT ============
+    function setTool(tool) {
+        state.currentTool = tool;
+        document.querySelectorAll('[id^="tool-"]').forEach(btn => btn.classList.remove('active'));
+        document.getElementById(`tool-${tool}`).classList.add('active');
+        
+        canvas.style.cursor = tool === 'pan' ? 'grab' : tool === 'measure' ? 'crosshair' : 'default';
+        statusText.textContent = `Tool: ${tool.charAt(0).toUpperCase() + tool.slice(1)}`;
+    }
+
+    toolUpload.addEventListener('click', () => fileInput.click());
+    toolPan.addEventListener('click', () => setTool('pan'));
+    toolZoom.addEventListener('click', () => setTool('zoom'));
+    toolMeasure.addEventListener('click', () => setTool('measure'));
+    toolAnnotate.addEventListener('click', () => setTool('annotate'));
+    toolClear.addEventListener('click', clearMeasurements);
+
+    // ============ TAB MANAGEMENT ============
+    tabButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tab = btn.dataset.tab;
+            tabButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            tabContents.forEach(content => content.classList.add('hidden'));
+            document.getElementById(`tab-${tab}`).classList.remove('hidden');
+        });
+    });
+
+    // ============ IMAGE LOADING ============
+    let loadedImage = null;
+
+    fileInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            loadImage(file);
+        }
+    });
+
+    viewerContainer.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        viewerContainer.style.borderColor = '#0ea5e9';
+    });
+
+    viewerContainer.addEventListener('dragleave', () => {
+        viewerContainer.style.borderColor = '#2d2d2d';
+    });
+
+    viewerContainer.addEventListener('drop', (e) => {
+        e.preventDefault();
+        viewerContainer.style.borderColor = '#2d2d2d';
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) {
+            loadImage(file);
+        }
+    });
+
+    function loadImage(file) {
+        state.uploadedFile = file;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                loadedImage = img;
+                state.imageLoaded = true;
+                
+                // Set canvas size to image size
+                canvas.width = img.width;
+                canvas.height = img.height;
+                
+                // Center and fit image
+                fitImageToViewer();
+                
+                uploadPlaceholder.classList.add('hidden');
+                canvas.classList.remove('hidden');
+                
+                renderCanvas();
+                
+                statusImage.textContent = `Image: ${img.width}×${img.height}px`;
+                statusText.textContent = 'Ready - Image loaded';
+                
+                if (!inputId.value) {
+                    inputId.value = generatePatientId();
+                }
+                updateMetadata();
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function fitImageToViewer() {
+        const containerWidth = viewerContainer.clientWidth;
+        const containerHeight = viewerContainer.clientHeight;
+        const imgAspect = loadedImage.width / loadedImage.height;
+        const containerAspect = containerWidth / containerHeight;
+        
+        if (imgAspect > containerAspect) {
+            state.scale = (containerWidth * 0.9) / loadedImage.width;
+        } else {
+            state.scale = (containerHeight * 0.9) / loadedImage.height;
+        }
+        
+        state.panX = 0;
+        state.panY = 0;
+        updateZoomDisplay();
+    }
+
+    function updateZoomDisplay() {
+        const zoomPercent = Math.round(state.scale * 100);
+        document.getElementById('meta-zoom').textContent = `Zoom: ${zoomPercent}%`;
+    }
+
+    // ============ CANVAS RENDERING ============
+    function renderCanvas() {
+        if (!loadedImage) return;
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(loadedImage, 0, 0);
+        
+        // Draw measurements
+        state.measurements.forEach((m, idx) => {
+            drawMeasurement(m, idx);
+        });
+        
+        // Draw temp measurement
+        if (state.tempMeasurement) {
+            drawMeasurement(state.tempMeasurement, -1, true);
         }
     }
 
+    function drawMeasurement(m, idx, isTemp = false) {
+        const { x1, y1, x2, y2 } = m;
+        
+        // Draw line
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.strokeStyle = isTemp ? '#60a5fa' : '#0ea5e9';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Draw points
+        [{ x: x1, y: y1 }, { x: x2, y: y2 }].forEach(pt => {
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
+            ctx.fillStyle = isTemp ? '#60a5fa' : '#0ea5e9';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        });
+        
+        // Calculate distance
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const pixelDistance = Math.sqrt(dx * dx + dy * dy);
+        const mmDistance = pixelDistance * state.pixelSpacing;
+        
+        // Draw label
+        const midX = (x1 + x2) / 2;
+        const midY = (y1 + y2) / 2;
+        const label = `${mmDistance.toFixed(1)} mm`;
+        
+        ctx.font = '12px IBM Plex Mono';
+        ctx.fillStyle = '#0ea5e9';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        
+        // Background for text
+        const textWidth = ctx.measureText(label).width;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(midX - textWidth / 2 - 4, midY - 18, textWidth + 8, 16);
+        
+        ctx.fillStyle = '#0ea5e9';
+        ctx.fillText(label, midX, midY - 4);
+    }
 
-    // --- Image Handling ---
-    const handleFile = (file) => {
-        if (file && file.type.startsWith('image/')) {
-            uploadedFile = file;
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                imagePreview.src = e.target.result;
-                imagePreviewContainer.classList.remove('hidden');
-                uploadPlaceholder.classList.add('hidden');
-            };
-            reader.readAsDataURL(file);
+    // ============ MOUSE INTERACTION ============
+    canvas.addEventListener('mousedown', handleMouseDown);
+    canvas.addEventListener('mousemove', handleMouseMove);
+    canvas.addEventListener('mouseup', handleMouseUp);
+    canvas.addEventListener('wheel', handleWheel);
+
+    function getCanvasCoordinates(e) {
+        const rect = canvas.getBoundingClientRect();
+        const scaleX = canvas.width / rect.width;
+        const scaleY = canvas.height / rect.height;
+        return {
+            x: (e.clientX - rect.left) * scaleX,
+            y: (e.clientY - rect.top) * scaleY
+        };
+    }
+
+    function handleMouseDown(e) {
+        const coords = getCanvasCoordinates(e);
+        
+        if (state.currentTool === 'pan') {
+            state.isPanning = true;
+            state.lastMouseX = e.clientX;
+            state.lastMouseY = e.clientY;
+            canvas.style.cursor = 'grabbing';
+        } else if (state.currentTool === 'measure') {
+            if (!state.tempMeasurement) {
+                state.tempMeasurement = {
+                    x1: coords.x,
+                    y1: coords.y,
+                    x2: coords.x,
+                    y2: coords.y
+                };
+            }
         }
+    }
+
+    function handleMouseMove(e) {
+        if (state.currentTool === 'pan' && state.isPanning) {
+            const dx = e.clientX - state.lastMouseX;
+            const dy = e.clientY - state.lastMouseY;
+            state.panX += dx;
+            state.panY += dy;
+            state.lastMouseX = e.clientX;
+            state.lastMouseY = e.clientY;
+            updateCanvasTransform();
+        } else if (state.currentTool === 'measure' && state.tempMeasurement) {
+            const coords = getCanvasCoordinates(e);
+            state.tempMeasurement.x2 = coords.x;
+            state.tempMeasurement.y2 = coords.y;
+            renderCanvas();
+        }
+    }
+
+    function handleMouseUp(e) {
+        if (state.currentTool === 'pan') {
+            state.isPanning = false;
+            canvas.style.cursor = 'grab';
+        } else if (state.currentTool === 'measure' && state.tempMeasurement) {
+            const dx = state.tempMeasurement.x2 - state.tempMeasurement.x1;
+            const dy = state.tempMeasurement.y2 - state.tempMeasurement.y1;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance > 5) {
+                state.measurements.push({ ...state.tempMeasurement });
+                updateMeasurementsList();
+            }
+            state.tempMeasurement = null;
+            renderCanvas();
+        }
+    }
+
+    function handleWheel(e) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        state.scale *= delta;
+        state.scale = Math.max(0.1, Math.min(5, state.scale));
+        updateCanvasTransform();
+        updateZoomDisplay();
+    }
+
+    function updateCanvasTransform() {
+        canvas.style.transform = `translate(-50%, -50%) translate(${state.panX}px, ${state.panY}px) scale(${state.scale})`;
+    }
+
+    // ============ MEASUREMENTS UI ============
+    function updateMeasurementsList() {
+        if (state.measurements.length === 0) {
+            measurementsList.innerHTML = `
+                <div class="text-gray-600 text-center py-8">
+                    <p>No measurements yet</p>
+                    <p class="text-[10px] mt-1">Use 📏 tool to measure distances</p>
+                </div>
+            `;
+            return;
+        }
+        
+        measurementsList.innerHTML = state.measurements.map((m, idx) => {
+            const dx = m.x2 - m.x1;
+            const dy = m.y2 - m.y1;
+            const pixelDistance = Math.sqrt(dx * dx + dy * dy);
+            const mmDistance = (pixelDistance * state.pixelSpacing).toFixed(1);
+            
+            return `
+                <div class="flex items-center justify-between p-2 bg-[#2d2d2d] rounded">
+                    <div class="flex items-center space-x-2">
+                        <span class="text-[#0ea5e9]">📏</span>
+                        <span class="mono">Measurement ${idx + 1}</span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <span class="mono font-semibold text-[#0ea5e9]">${mmDistance} mm</span>
+                        <button class="text-red-400 hover:text-red-300" onclick="deleteMeasurement(${idx})">✕</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    window.deleteMeasurement = function(idx) {
+        state.measurements.splice(idx, 1);
+        updateMeasurementsList();
+        renderCanvas();
     };
 
-    imageDropArea.addEventListener('click', () => imageUploadInput.click());
-    
-    // Drag and drop functionality
-    imageDropArea.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        imageDropArea.classList.add('border-blue-400');
-    });
-    imageDropArea.addEventListener('dragleave', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        imageDropArea.classList.remove('border-blue-400');
-    });
-    imageDropArea.addEventListener('drop', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        imageDropArea.classList.remove('border-blue-400');
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-            handleFile(files[0]);
+    function clearMeasurements() {
+        state.measurements = [];
+        state.tempMeasurement = null;
+        updateMeasurementsList();
+        renderCanvas();
+    }
+
+    clearMeasurementsBtn.addEventListener('click', clearMeasurements);
+
+    // ============ AI ANALYSIS ============
+    analyzeBtn.addEventListener('click', async () => {
+        if (!state.imageLoaded) {
+            showError('Please upload a CT scan image first');
+            return;
         }
-    });
-
-    // Listener for file input change (e.g., after choosing a file)
-    imageUploadInput.addEventListener('change', (e) => {
-        const files = e.target.files;
-        if (files && files.length > 0) {
-            handleFile(files[0]);
-        }
-    });
-
-    // --- API Call Logic ---
-    async function getAIAnalysis(base64Image, text) {
-        // Leave apiKey as an empty string. The platform will provide it.
-        const apiKey = "AIzaSyAFNjONYeiQ6HkY4RKdyeJLFpfIbAdBxJk"; 
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-
-        const systemPrompt = `You are an expert radiology and neurology AI assistant named CEREBRO. 
-        Your task is to analyze a brain CT scan and patient notes to provide a stroke triage recommendation for clinicians in Indonesia.
         
-        Analyze the provided image and text, then respond ONLY with a single, minified JSON object. Do not include any other text, markdown, or explanations.
-        The JSON object must have the following structure:
-        {
-          "triage_level": "High" | "Moderate" | "Low" | "Critical",
-          "diagnosis": "Hemorrhagic Stroke Suspected" | "Ischemic Stroke Suspected" | "No Acute Stroke Indicators" | "Other Critical Finding",
-          "confidence": number,
-          "summary": "A concise, professional summary for a clinician, explaining your reasoning based on visual evidence from the CT scan and the provided patient history. Mention specific findings if possible (e.g., 'hyperdensity in the left basal ganglia consistent with hemorrhage').",
-          "localization": { "x": number, "y": number, "radius": number } | null
+        const symptoms = inputSymptoms.value.trim();
+        if (!symptoms) {
+            showError('Please enter patient symptoms and history');
+            return;
         }
-
-        For the "localization" field:
-        - If a clear anomaly (like a hemorrhage or infarct) is visible and associated with a "High" or "Critical" triage, provide its location.
-        - "x" and "y" are the coordinates of the center of the anomaly, as percentages (0-100) from the top-left corner of the image.
-        - "radius" is the approximate radius of the anomaly, as a percentage (0-100) of the image's shortest side.
-        - If no specific anomaly is confidently located, or if the triage level is "Low" or "Moderate", return null for this field.
-        `;
         
-        const userPrompt = `Patient Symptoms & History: ${text}`;
+        setAnalysisState('loading');
+        
+        try {
+            const base64Image = canvas.toDataURL('image/jpeg').split(',')[1];
+            const startTime = Date.now();
+            const result = await getAIAnalysis(base64Image, symptoms);
+            const processingTime = ((Date.now() - startTime) / 1000).toFixed(1);
+            
+            state.analysisData = result;
+            displayAnalysisResults(result);
+            statusTime.textContent = `Processing: ${processingTime}s`;
+            
+            // Switch to analysis tab
+            document.querySelector('[data-tab="analysis"]').click();
+        } catch (error) {
+            console.error('Analysis failed:', error);
+            showError(`Analysis failed: ${error.message}`);
+        }
+    });
+
+    function setAnalysisState(state) {
+        if (state === 'loading') {
+            analyzeText.classList.add('hidden');
+            analyzeLoader.classList.remove('hidden');
+            analyzeBtn.disabled = true;
+            statusText.textContent = 'Running AI analysis...';
+        } else {
+            analyzeText.classList.remove('hidden');
+            analyzeLoader.classList.add('hidden');
+            analyzeBtn.disabled = false;
+            statusText.textContent = 'Ready';
+        }
+    }
+
+    function showError(message) {
+        analysisError.textContent = message;
+        analysisError.classList.remove('hidden');
+        analysisPlaceholder.classList.add('hidden');
+        analysisResult.classList.add('hidden');
+        setAnalysisState('idle');
+        
+        setTimeout(() => {
+            analysisError.classList.add('hidden');
+            analysisPlaceholder.classList.remove('hidden');
+        }, 5000);
+    }
+
+    async function getAIAnalysis(base64Image, symptoms) {
+        const apiKey = "AIzaSyAFNjONYeiQ6HkY4RKdyeJLFpfIbAdBxJk";
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${apiKey}`;
+
+        const systemPrompt = `You are CEREBRO, an expert radiology AI for stroke triage in clinical settings.
+
+Analyze the brain CT scan and patient history to provide a professional triage assessment.
+
+Respond with a single JSON object:
+{
+  "triage_level": "Critical" | "High" | "Moderate" | "Low",
+  "diagnosis": "Brief diagnosis (e.g., 'Hemorrhagic Stroke Suspected')",
+  "confidence": number (0-100),
+  "summary": "Professional clinical summary with specific CT findings, mechanisms, and clinical correlation. Mention visible abnormalities, their location, and significance.",
+  "localization": { "x": number, "y": number, "radius": number } | null,
+  "recommendations": ["recommendation1", "recommendation2", "recommendation3"]
+}
+
+For localization: x, y are percentages (0-100) from top-left, radius is percentage of shortest side. Only include if clear focal abnormality is visible and triage is High/Critical.
+
+Recommendations should be specific clinical actions (e.g., "Immediate neurosurgery consult", "CT angiography within 15 minutes").`;
 
         const payload = {
-            systemInstruction: {
-                parts: [{ text: systemPrompt }]
-            },
+            systemInstruction: { parts: [{ text: systemPrompt }] },
             contents: [{
                 parts: [
-                    { text: userPrompt },
-                    {
-                        inlineData: {
-                            mimeType: "image/jpeg",
-                            data: base64Image
-                        }
-                    }
+                    { text: `Patient History:\n${symptoms}` },
+                    { inlineData: { mimeType: "image/jpeg", data: base64Image } }
                 ]
             }],
-             generationConfig: {
-                 responseMimeType: "application/json",
-            }
+            generationConfig: { responseMimeType: "application/json" }
         };
 
-        // Exponential backoff for retries
-        let response;
-        let delay = 1000;
-        for (let i = 0; i < 5; i++) {
-            try {
-                response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                if (response.ok) {
-                    break;
-                }
-            } catch (error) {
-                console.error("Fetch error:", error);
-            }
-            await new Promise(resolve => setTimeout(resolve, delay));
-            delay *= 2;
-        }
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
 
-        if (!response || !response.ok) {
-            throw new Error('API request failed after multiple retries.');
-        }
+        if (!response.ok) throw new Error('API request failed');
         
         const result = await response.json();
         
-        if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0].text) {
-             try {
-                // The API now directly returns a JSON string, so we just need to parse it.
-                return JSON.parse(result.candidates[0].content.parts[0].text);
-            } catch (e) {
-                console.error("Failed to parse JSON response:", result.candidates[0].content.parts[0].text);
-                throw new Error("Received an invalid JSON response from the AI.");
-            }
-        } else {
-            console.error("Unexpected API response structure:", result);
-            throw new Error('Could not get a valid response from the AI model.');
+        if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
+            return JSON.parse(result.candidates[0].content.parts[0].text);
         }
+        
+        throw new Error('Invalid API response');
     }
 
-    // --- UI Update Logic ---
-    function displayResults(data) {
-        const { triage_level, diagnosis, confidence, summary, localization } = data;
-
-        // Triage Banner Styling
-        const triageStyles = {
-            'Critical': {
-                bg: 'bg-red-800/80',
-                border: 'border-red-600',
-                text: 'text-red-100',
-                icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>`
-            },
-            'High': {
-                bg: 'bg-red-800/80',
-                border: 'border-red-600',
-                text: 'text-red-100',
-                icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>`
-            },
-            'Moderate': {
-                bg: 'bg-yellow-800/80',
-                border: 'border-yellow-600',
-                text: 'text-yellow-100',
-                icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`
-            },
-            'Low': {
-                bg: 'bg-green-800/80',
-                border: 'border-green-600',
-                text: 'text-green-100',
-                icon: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-8 h-8"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`
-            }
+    function displayAnalysisResults(data) {
+        const { triage_level, diagnosis, confidence, summary, localization, recommendations } = data;
+        
+        // Show result container
+        analysisPlaceholder.classList.add('hidden');
+        analysisError.classList.add('hidden');
+        analysisResult.classList.remove('hidden');
+        
+        // Urgency banner
+        const urgencyStyles = {
+            'Critical': { class: 'urgency-critical', icon: '🚨' },
+            'High': { class: 'urgency-high', icon: '⚠️' },
+            'Moderate': { class: 'urgency-moderate', icon: '⚡' },
+            'Low': { class: 'urgency-low', icon: '✓' }
         };
-        const style = triageStyles[triage_level] || triageStyles['Moderate'];
-        triageBanner.className = `p-4 rounded-lg flex items-center space-x-4 border ${style.bg} ${style.border} ${style.text}`;
-        triageIcon.innerHTML = style.icon;
-        triageDiagnosis.textContent = diagnosis;
-        triageLevel.textContent = `Urgency: ${triage_level}`;
         
-        // Confidence Score
-        confidenceBar.style.width = `${confidence}%`;
-        confidenceText.textContent = `${confidence}%`;
-
+        const style = urgencyStyles[triage_level] || urgencyStyles['Moderate'];
+        const banner = document.getElementById('urgency-banner');
+        banner.className = `p-3 rounded border flex items-center space-x-3 ${style.class}`;
+        document.getElementById('urgency-icon').textContent = style.icon;
+        document.getElementById('urgency-diagnosis').textContent = diagnosis;
+        document.getElementById('urgency-level').textContent = `Priority: ${triage_level.toUpperCase()}`;
+        
+        // Confidence
+        document.getElementById('confidence-value').textContent = `${confidence}%`;
+        document.getElementById('confidence-bar').style.width = `${confidence}%`;
+        statusConfidence.textContent = `Confidence: ${confidence}%`;
+        
         // Summary
-        summaryText.textContent = summary;
-
-        // Heatmap Overlay
+        document.getElementById('ai-summary').textContent = summary;
+        
+        // Recommendations
+        const recList = document.getElementById('recommendations-list');
+        if (recommendations && recommendations.length > 0) {
+            recList.innerHTML = recommendations.map(r => `<li>• ${r}</li>`).join('');
+        }
+        
+        // Heatmap
         if (localization && (triage_level === 'High' || triage_level === 'Critical')) {
-            showOverlay(localization);
+            showHeatmap(localization);
         } else {
-            hideOverlay();
-        }
-
-        setUIState('result');
-    }
-
-    function showOverlay(loc) {
-        const rect = imagePreview.getBoundingClientRect();
-        const containerRect = imagePreviewContainer.getBoundingClientRect();
-
-        // Calculate the actual rendered dimensions and position of the image inside the `object-contain` element
-        const naturalWidth = imagePreview.naturalWidth;
-        const naturalHeight = imagePreview.naturalHeight;
-        const aspectRatio = naturalWidth / naturalHeight;
-        
-        let renderedWidth = rect.width;
-        let renderedHeight = rect.height;
-        let leftOffset = rect.left - containerRect.left;
-        let topOffset = rect.top - containerRect.top;
-
-        if (rect.width / rect.height > aspectRatio) { // Image is constrained by height
-            renderedWidth = renderedHeight * aspectRatio;
-            leftOffset += (rect.width - renderedWidth) / 2;
-        } else { // Image is constrained by width
-            renderedHeight = renderedWidth / aspectRatio;
-            topOffset += (rect.height - renderedHeight) / 2;
+            heatmapOverlay.classList.add('hidden');
         }
         
-        const shortestSide = Math.min(renderedWidth, renderedHeight);
-        const radiusPixels = (loc.radius / 100) * shortestSide;
-
-        const overlaySize = radiusPixels * 2;
-        const overlayX = leftOffset + (loc.x / 100) * renderedWidth - radiusPixels;
-        const overlayY = topOffset + (loc.y / 100) * renderedHeight - radiusPixels;
-
-        imageOverlay.style.width = `${overlaySize}px`;
-        imageOverlay.style.height = `${overlaySize}px`;
-        imageOverlay.style.top = `${overlayY}px`;
-        imageOverlay.style.left = `${overlayX}px`;
-        imageOverlay.classList.remove('hidden');
-    }
-
-    function hideOverlay() {
-        imageOverlay.classList.add('hidden');
-    }
-
-    // --- Event Listeners ---
-    analyzeButton.addEventListener('click', async () => {
-        if (!uploadedFile) {
-            errorMessage.textContent = 'Please upload a CT scan image.';
-            setUIState('error');
-            return;
-        }
-        const symptoms = symptomsInput.value;
-        if (!symptoms || symptoms.trim() === '') {
-            errorMessage.textContent = 'Please enter patient symptoms and history.';
-            setUIState('error');
-            return;
-        }
+        // Generate report
+        generateReport(data);
         
-        setUIState('loading');
+        setAnalysisState('idle');
+    }
 
-        try {
-            const base64Image = imagePreview.src.split(',')[1];
-            const resultData = await getAIAnalysis(base64Image, symptoms);
-            displayResults(resultData);
-        } catch (error) {
-            console.error('Analysis failed:', error);
-            errorMessage.textContent = `An error occurred during analysis: ${error.message}`;
-            setUIState('error');
-        }
+    function showHeatmap(loc) {
+        const rect = canvas.getBoundingClientRect();
+        const x = rect.left + (loc.x / 100) * rect.width;
+        const y = rect.top + (loc.y / 100) * rect.height;
+        const size = (loc.radius / 100) * Math.min(rect.width, rect.height) * 2;
+        
+        heatmapOverlay.style.left = `${x - size / 2}px`;
+        heatmapOverlay.style.top = `${y - size / 2}px`;
+        heatmapOverlay.style.width = `${size}px`;
+        heatmapOverlay.style.height = `${size}px`;
+        heatmapOverlay.classList.remove('hidden');
+    }
+
+    function generateReport(data) {
+        const now = new Date();
+        const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        
+        const report = `
+CEREBRO AI STROKE TRIAGE REPORT
+Generated: ${dateStr} at ${timeStr}
+
+PATIENT INFORMATION
+Name: ${inputName.value || 'Anonymous'}
+ID: ${inputId.value || '-'}
+Age: ${inputAge.value || '-'} years
+Sex: ${inputSex.value || '-'}
+
+CLINICAL HISTORY
+${inputSymptoms.value}
+
+AI ANALYSIS RESULTS
+Triage Level: ${data.triage_level.toUpperCase()}
+Diagnosis: ${data.diagnosis}
+Confidence: ${data.confidence}%
+
+FINDINGS
+${data.summary}
+
+RECOMMENDATIONS
+${data.recommendations ? data.recommendations.map((r, i) => `${i + 1}. ${r}`).join('\n') : 'None'}
+
+MEASUREMENTS
+${state.measurements.length > 0 ? state.measurements.map((m, i) => {
+    const dx = m.x2 - m.x1;
+    const dy = m.y2 - m.y1;
+    const dist = (Math.sqrt(dx * dx + dy * dy) * state.pixelSpacing).toFixed(1);
+    return `${i + 1}. Linear measurement: ${dist} mm`;
+}).join('\n') : 'No measurements recorded'}
+
+---
+This report was generated by CEREBRO AI Triage System
+Tsinghua University IEDE Program - Group 28
+This is an AI-assisted analysis and should be verified by a qualified radiologist.
+        `.trim();
+        
+        document.getElementById('report-content').textContent = report;
+        document.getElementById('copy-report').classList.remove('hidden');
+    }
+
+    // ============ REPORT ACTIONS ============
+    document.getElementById('copy-report').addEventListener('click', () => {
+        const report = document.getElementById('report-content').textContent;
+        navigator.clipboard.writeText(report).then(() => {
+            statusText.textContent = 'Report copied to clipboard';
+            setTimeout(() => statusText.textContent = 'Ready', 2000);
+        });
     });
 
-    resetButton.addEventListener('click', () => {
-        setUIState('initial');
+    exportBtn.addEventListener('click', () => {
+        if (!state.analysisData) {
+            alert('Please run analysis first');
+            return;
+        }
+        
+        const report = document.getElementById('report-content').textContent;
+        const blob = new Blob([report], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `CEREBRO_Report_${inputId.value || 'case'}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        statusText.textContent = 'Report exported';
+        setTimeout(() => statusText.textContent = 'Ready', 2000);
     });
 
-    // --- Initial State ---
-    setUIState('initial');
+    saveBtn.addEventListener('click', () => {
+        const caseData = {
+            patient: {
+                name: inputName.value,
+                id: inputId.value,
+                age: inputAge.value,
+                sex: inputSex.value,
+                symptoms: inputSymptoms.value
+            },
+            analysis: state.analysisData,
+            measurements: state.measurements,
+            timestamp: new Date().toISOString()
+        };
+        
+        const blob = new Blob([JSON.stringify(caseData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `CEREBRO_Case_${inputId.value || 'data'}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+        statusText.textContent = 'Case saved';
+        setTimeout(() => statusText.textContent = 'Ready', 2000);
+    });
+
+    resetHeaderBtn.addEventListener('click', resetApplication);
+
+    function resetApplication() {
+        if (state.analysisData && !confirm('Reset will clear all data. Continue?')) {
+            return;
+        }
+        
+        // Reset state
+        state.uploadedFile = null;
+        state.imageLoaded = false;
+        state.analysisData = null;
+        state.measurements = [];
+        state.tempMeasurement = null;
+        state.scale = 1;
+        state.panX = 0;
+        state.panY = 0;
+        
+        // Reset UI
+        canvas.classList.add('hidden');
+        uploadPlaceholder.classList.remove('hidden');
+        heatmapOverlay.classList.add('hidden');
+        
+        analysisPlaceholder.classList.remove('hidden');
+        analysisResult.classList.add('hidden');
+        analysisError.classList.add('hidden');
+        
+        inputName.value = '';
+        inputAge.value = '';
+        inputSex.value = '';
+        inputId.value = '';
+        inputSymptoms.value = '';
+        
+        updateMeasurementsList();
+        updateMetadata();
+        
+        statusText.textContent = 'Ready';
+        statusConfidence.textContent = 'Confidence: -';
+        statusTime.textContent = 'Processing: -';
+        statusImage.textContent = 'No image loaded';
+        
+        document.querySelector('[data-tab="patient"]').click();
+    }
+
+    // ============ INITIALIZATION ============
+    setTool('pan');
+    updateMetadata();
+    updateMeasurementsList();
+    inputId.value = generatePatientId();
 
 </script>
 
