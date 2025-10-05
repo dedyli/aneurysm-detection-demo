@@ -558,6 +558,10 @@
                     inputId.value = generatePatientId();
                 }
                 updateMetadata();
+                
+                // Show 3D UI
+                threeDPlaceholder.classList.add('hidden');
+                threeDContainer.classList.remove('hidden');
             };
             img.src = e.target.result;
         };
@@ -1074,6 +1078,13 @@ This is an AI-assisted analysis and should be verified by a qualified radiologis
         state.panX = 0;
         state.panY = 0;
         
+        // Reset 3D
+        syntheticSlices = [];
+        if (brainMesh) {
+            scene.remove(brainMesh);
+            brainMesh = null;
+        }
+        
         // Reset UI
         canvas.classList.add('hidden');
         uploadPlaceholder.classList.remove('hidden');
@@ -1082,6 +1093,10 @@ This is an AI-assisted analysis and should be verified by a qualified radiologis
         analysisPlaceholder.classList.remove('hidden');
         analysisResult.classList.add('hidden');
         analysisError.classList.add('hidden');
+        
+        threeDPlaceholder.classList.remove('hidden');
+        threeDContainer.classList.add('hidden');
+        threeDControls.classList.add('hidden');
         
         inputName.value = '';
         inputAge.value = '';
